@@ -1180,7 +1180,7 @@ body::after{content:'';position:fixed;inset:0;background-image:url("data:image/s
     <div id="import-url-section">
       <div class="form-group" style="margin-bottom:12px;">
         <label class="form-label">Recipe URL</label>
-        <input type="url" class="form-input" id="import-url" placeholder="https://www.allrecipes.com/recipe/..." style="font-size:14px;">
+        <input type="url" class="form-input" id="modal-import-url" placeholder="https://www.allrecipes.com/recipe/..." style="font-size:14px;">
       </div>
       <button class="btn btn-primary" style="width:100%;margin-bottom:14px;" onclick="analyzeRecipeUrl()">🔍 Fetch & Analyze Recipe</button>
       <div style="font-size:11px;color:var(--gray2);margin-bottom:14px;line-height:1.5;">Works with most recipe sites: Allrecipes, Food Network, BBC Good Food, Tasty, and more. If it can't auto-detect, paste the ingredients below.</div>
@@ -1192,14 +1192,14 @@ body::after{content:'';position:fixed;inset:0;background-image:url("data:image/s
     <!-- Shared: Recipe Name + Ingredients -->
     <div class="form-group" style="margin-bottom:12px;">
       <label class="form-label">Recipe Name</label>
-      <input type="text" class="form-input" id="import-recipe-name" placeholder="e.g. Chicken Fried Rice" style="font-size:14px;">
+      <input type="text" class="form-input" id="modal-import-recipe-name" placeholder="e.g. Chicken Fried Rice" style="font-size:14px;">
     </div>
     <div class="form-group" style="margin-bottom:12px;">
       <label class="form-label">Ingredients (one per line)</label>
-      <textarea class="form-input" id="import-ingredients" rows="7" placeholder="200g chicken breast&#10;1 cup white rice&#10;2 tbsp soy sauce&#10;1 tbsp sesame oil&#10;2 eggs&#10;1 cup broccoli" style="font-size:13px;resize:vertical;"></textarea>
+      <textarea class="form-input" id="modal-import-ingredients" rows="7" placeholder="200g chicken breast&#10;1 cup white rice&#10;2 tbsp soy sauce&#10;1 tbsp sesame oil&#10;2 eggs&#10;1 cup broccoli" style="font-size:13px;resize:vertical;"></textarea>
     </div>
     <button class="btn btn-outline" style="width:100%;margin-bottom:12px;" onclick="analyzeIngredients()">⚡ Analyze Nutrition</button>
-    <div id="import-result" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:4px;"></div>
+    <div id="modal-import-result" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:4px;"></div>
     <button class="btn btn-ghost" style="width:100%;margin-top:12px;" onclick="closeModal()">Cancel</button>
   </div>
 </div>
@@ -2441,13 +2441,17 @@ function switchImportTab(tab) {
 }
 
 async function analyzeRecipeUrl() {
-  const urlEl = document.getElementById('import-url');
+  // Check modal input first (modal may be open), then fall back to page input
+  const modalUrlEl = document.getElementById('modal-import-url');
+  const pageUrlEl  = document.getElementById('import-url');
+  const urlEl = (modalUrlEl && modalUrlEl.value.trim()) ? modalUrlEl : pageUrlEl;
   const url = urlEl ? urlEl.value.trim() : '';
   if(!url){ toast('Enter a recipe URL first','info'); return; }
 
-  const resultEl = document.getElementById('import-result');
-  const nameEl   = document.getElementById('import-recipe-name');
-  const ingEl    = document.getElementById('import-ingredients');
+  // Result/name/ingredient elements — check modal first, then page
+  const resultEl = document.getElementById('modal-import-result') || document.getElementById('import-result');
+  const nameEl   = document.getElementById('modal-import-recipe-name') || document.getElementById('import-recipe-name');
+  const ingEl    = document.getElementById('modal-import-ingredients') || document.getElementById('import-ingredients');
 
   if(resultEl) {
     resultEl.style.display='block';
