@@ -1142,7 +1142,12 @@ body::after{content:'';position:fixed;inset:0;background-image:url("data:image/s
         <label class="form-label">Ingredients (one per line)</label>
         <textarea class="form-input" id="import-ingredients" rows="8" placeholder="200g chicken breast&#10;1 cup white rice&#10;2 tbsp soy sauce&#10;1 tbsp olive oil&#10;2 eggs&#10;1 cup broccoli" style="font-size:13px;resize:vertical;min-height:160px;"></textarea>
       </div>
-      <button class="btn btn-outline" style="width:100%;margin-bottom:12px;" onclick="analyzeIngredients()">⚡ Calculate Nutrition</button>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Number of Servings this Recipe Makes</label>
+        <input type="number" class="form-input" id="recipe-servings" value="4" min="1" max="50" style="font-size:16px;" placeholder="e.g. 4">
+        <div style="font-size:11px;color:var(--gray2);margin-top:4px;">Results will show nutrition PER SERVING</div>
+      </div>
+      <button class="btn btn-outline" style="width:100%;margin-bottom:12px;" onclick="analyzeIngredients()">⚡ Calculate Nutrition Per Serving</button>
     </div>
     <div class="card">
       <div class="card-title">Nutrition Analysis</div>
@@ -2134,6 +2139,55 @@ const ING_DB = {
   'spinach':           [23,  2.9, 3.6, 0.4],
   'kale':              [49,  4.3, 9,   0.9],
   'tomato':            [18,  0.9, 3.9, 0.2],
+  'mayonnaise':        [680, 0.9, 0.6, 75],   // 1 cup mayo ≈ 220g
+  'mayo':              [680, 0.9, 0.6, 75],
+  'sour cream':        [198, 2.4, 4.6, 20],
+  'cream cheese':      [342, 6,   4.1, 34],
+  'celery':            [16,  0.7, 3,   0.2],
+  'green onion':       [32,  1.8, 7.3, 0.2],
+  'scallion':          [32,  1.8, 7.3, 0.2],
+  'mustard':           [66,  4.4, 5.8, 3.3],
+  'dijon':             [66,  4.4, 5.8, 3.3],
+  'pickle':            [11,  0.4, 2.3, 0.2],
+  'relish':            [58,  0.3, 14,  0.1],
+  'lemon juice':       [22,  0.4, 6.9, 0.2],
+  'vinegar':           [18,  0,   0.9, 0],
+  'salt':              [0,   0,   0,   0],
+  'pepper':            [251, 10,  64,  3.3],
+  'dill':              [43,  3.5, 7,   1.1],
+  'parsley':           [36,  3,   6.3, 0.8],
+  'cilantro':          [23,  2.1, 3.7, 0.5],
+  'basil':             [23,  3.2, 2.7, 0.6],
+  'oregano':           [265, 9,   69,  4.3],
+  'cumin':             [375, 18,  44,  22],
+  'paprika':           [282, 14,  54,  13],
+  'cinnamon':          [247, 4,   81,  1.2],
+  'breadcrumb':        [395, 13,  74,  5],
+  'bread crumb':       [395, 13,  74,  5],
+  'panko':             [395, 13,  74,  5],
+  'cornstarch':        [381, 0.3, 91,  0.1],
+  'baking powder':     [53,  0,   28,  0],
+  'baking soda':       [0,   0,   0,   0],
+  'vanilla':           [288, 0.1, 13,  0.1],
+  'cocoa':             [228, 20,  58,  14],
+  'chocolate':         [546, 5,   60,  31],
+  'heavy cream':       [340, 2.8, 2.8, 36],
+  'half and half':     [130, 3.2, 4.3, 11],
+  'coconut milk':      [197, 2,   2.8, 21],
+  'beef broth':        [10,  1.3, 0.2, 0.3],
+  'chicken broth':     [15,  2,   0.5, 0.5],
+  'vegetable broth':   [7,   0.3, 1.5, 0],
+  'tomato sauce':      [29,  1.5, 6,   0.2],
+  'tomato paste':      [82,  4.3, 19,  0.5],
+  'soy sauce':         [53,  8.1, 5,   0.6],
+  'worcestershire':    [78,  0,   20,  0],
+  'hot sauce':         [20,  1,   3,   0.5],
+  'teriyaki':          [89,  5.2, 17,  0.3],
+  'tahini':            [595, 17,  21,  54],
+  'hummus':            [166, 7.9, 14,  9.6],
+  'pesto':             [263, 4.9, 3.6, 26],
+  'salsa':             [36,  1.6, 7,   0.3],
+  'guacamole':         [155, 1.9, 8.5, 14],
   'onion':             [40,  1.1, 9,   0.1],
   'garlic':            [149, 6.4, 33,  0.5],
   'mushroom':          [22,  3.1, 3.3, 0.3],
@@ -2195,6 +2249,31 @@ const ING_DB = {
 
 // Unit → grams conversion
 // IMPORTANT: cups for liquids vs dry is different
+// Cup weights vary hugely by ingredient
+// These overrides apply ONLY when we detect a specific ingredient + cup combo
+const CUP_OVERRIDES = {
+  'mayonnaise': 220, 'mayo': 220,
+  'sour cream': 230, 'yogurt': 245, 'greek yogurt': 245,
+  'milk': 244, 'heavy cream': 238, 'half and half': 242,
+  'honey': 340, 'maple syrup': 322,
+  'flour': 120, 'sugar': 200, 'brown sugar': 220, 'powdered sugar': 120,
+  'oats': 90, 'rolled oats': 90,
+  'rice': 185, 'quinoa': 170,
+  'breadcrumb': 108, 'panko': 55,
+  'coconut milk': 240,
+  'salsa': 260, 'tomato sauce': 245, 'tomato paste': 262,
+  'chicken': 140, 'chicken breast': 140,
+  'beef': 225, 'turkey': 140,
+  'spinach': 30, 'lettuce': 47, 'kale': 67,
+  'broccoli': 91, 'cauliflower': 107,
+  'berries': 144, 'blueberries': 148,
+  'almonds': 143, 'walnuts': 117, 'cashews': 137, 'peanuts': 146,
+  'chocolate chips': 170,
+  'cocoa': 86,
+  'cheese': 113, 'cheddar': 113, 'mozzarella': 113,
+  'peanut butter': 258, 'almond butter': 250,
+};
+
 const UNITS_G = {
   // Weight
   'g': 1, 'gram': 1, 'grams': 1,
@@ -2246,16 +2325,31 @@ function estimateNutrition(lines) {
     total++;
 
     // ── Step 1: Extract quantity ──────────────────────────────
-    // Handle fractions like 1/2, 1/4
+    // Normalize unicode fractions FIRST
+    let normLine = line
+      .replace(/½/g,'0.5').replace(/⅓/g,'0.333').replace(/⅔/g,'0.667')
+      .replace(/¼/g,'0.25').replace(/¾/g,'0.75')
+      .replace(/⅛/g,'0.125').replace(/⅜/g,'0.375').replace(/⅝/g,'0.625').replace(/⅞/g,'0.875')
+      .replace(/⅙/g,'0.167').replace(/⅚/g,'0.833')
+      .replace(/1½/g,'1.5').replace(/1¼/g,'1.25').replace(/1¾/g,'1.75')
+      .replace(/2½/g,'2.5').replace(/2¼/g,'2.25').replace(/3½/g,'3.5');
+
     let qty = 1;
-    const fracMatch = line.match(/(\d+)\s*\/\s*(\d+)/);
-    const numMatch  = line.match(/^[\s\w]*?(\d+\.?\d*)/);
-    if(fracMatch) {
+    // Handle "1 1/2" mixed numbers
+    const mixedMatch = normLine.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)/);
+    const fracMatch  = normLine.match(/(\d+)\s*\/\s*(\d+)/);
+    const numMatch   = normLine.match(/(\d+\.?\d*)/);
+
+    if(mixedMatch) {
+      qty = parseInt(mixedMatch[1]) + parseInt(mixedMatch[2])/parseInt(mixedMatch[3]);
+    } else if(fracMatch) {
       qty = parseInt(fracMatch[1]) / parseInt(fracMatch[2]);
     } else if(numMatch) {
       qty = parseFloat(numMatch[1]);
     }
     if(qty <= 0 || qty > 2000) qty = 1;
+    // Use normalized line for rest of processing
+    const line2 = normLine;
 
     // ── Step 2: Find unit and convert to grams ────────────────
     let grams = null;
@@ -2263,7 +2357,7 @@ function estimateNutrition(lines) {
     // Try multi-word units first (e.g. "fl oz")
     for(const [unit, g] of Object.entries(UNITS_G)) {
       const pattern = new RegExp('\\b' + unit + '\\b', 'i');
-      if(pattern.test(line)) {
+      if(pattern.test(line2)) {
         grams = qty * g;
         break;
       }
@@ -2276,7 +2370,7 @@ function estimateNutrition(lines) {
     // Try longer ingredient names first (more specific)
     const sorted = Object.keys(ING_DB).sort((a,b) => b.length - a.length);
     for(const ingr of sorted) {
-      if(line.includes(ingr)) {
+      if(line2.includes(ingr)) {
         matched_ingr = ingr;
         ingr_data = ING_DB[ingr];
         break;
@@ -2287,13 +2381,16 @@ function estimateNutrition(lines) {
 
     // ── Step 4: Calculate grams if not from unit ──────────────
     if(grams === null) {
-      // Check if this is a countable ingredient
       if(ITEM_WEIGHTS[matched_ingr]) {
         grams = qty * ITEM_WEIGHTS[matched_ingr];
       } else {
-        // No unit found, assume grams if number looks like grams (>5)
-        // Otherwise assume 1 serving (100g)
         grams = qty > 5 ? qty : 100;
+      }
+    } else {
+      // We got grams from a unit — check if we should use ingredient-specific cup weight
+      const usedCup = /\bcups?\b/i.test(line2);
+      if(usedCup && matched_ingr && CUP_OVERRIDES[matched_ingr]) {
+        grams = qty * CUP_OVERRIDES[matched_ingr];
       }
     }
 
@@ -2352,23 +2449,15 @@ async function analyzeRecipeUrl() {
   const nameEl   = document.getElementById('import-recipe-name');
   const ingEl    = document.getElementById('import-ingredients');
 
-  // Show loading state
-  if(resultEl) resultEl.innerHTML = '<div style="text-align:center;padding:28px;color:var(--gray);"><div style="font-size:32px;margin-bottom:12px;">⏳</div>Fetching recipe from URL...<br><span style="font-size:11px;margin-top:8px;display:block;">This may take a few seconds</span></div>';
-  if(resultEl) resultEl.style.display = 'block';
+  if(resultEl) {
+    resultEl.style.display='block';
+    resultEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--gray);">⏳ Fetching recipe...</div>';
+  }
 
-  // Pre-fill recipe name from URL slug
-  try {
-    const urlObj = new URL(url);
-    const slug = urlObj.pathname.split('/').filter(s=>s.replace(/-/g,'').replace(/\d/g,'').length>3).pop()||'';
-    const guessedName = slug.replace(/-/g,' ').replace(/\w/g,c=>c.toUpperCase()).trim();
-    if(nameEl && !nameEl.value && guessedName) nameEl.value = guessedName;
-  } catch(e){}
-
-  // Try CORS proxies — these work when the file is opened locally in a browser
   const proxies = [
-    { url:`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, extract: d=>d.contents },
-    { url:`https://corsproxy.io/?${encodeURIComponent(url)}`, extract: d=>typeof d==='string'?d:null },
-    { url:`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`, extract: d=>typeof d==='string'?d:null },
+    { url:`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`, get: d=>d.contents },
+    { url:`https://corsproxy.io/?${encodeURIComponent(url)}`,             get: d=>typeof d==='string'?d:null },
+    { url:`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`, get: d=>typeof d==='string'?d:null },
   ];
 
   let html = '';
@@ -2380,77 +2469,179 @@ async function analyzeRecipeUrl() {
       clearTimeout(timer);
       if(!res.ok) continue;
       const raw = await res.text();
-      let parsed;
-      try { parsed = JSON.parse(raw); } catch(e) { parsed = raw; }
-      const extracted = proxy.extract(parsed);
-      if(extracted && extracted.length > 300) { html = extracted; break; }
+      let parsed; try { parsed=JSON.parse(raw); } catch(e) { parsed=raw; }
+      const got = proxy.get(parsed);
+      if(got && got.length > 300) { html = got; break; }
     } catch(e) { continue; }
   }
 
-  if(!html || html.length < 300) {
-    // Show helpful manual fallback — not an error, just guide them
-    if(resultEl) resultEl.innerHTML = `
-      <div style="background:var(--orange-g);border:1px solid var(--border2);border-radius:10px;padding:16px;margin-bottom:0;">
-        <div style="font-weight:700;font-size:14px;color:var(--orange);margin-bottom:8px;">📋 Paste the ingredients manually</div>
-        <div style="font-size:13px;color:var(--gray);line-height:1.6;margin-bottom:10px;">
-          Auto-fetch works when using this file in Chrome/Safari locally. To import from any recipe site:<br><br>
-          <strong style="color:var(--white);">1.</strong> Open the recipe website in another tab<br>
-          <strong style="color:var(--white);">2.</strong> Copy the ingredients list<br>
-          <strong style="color:var(--white);">3.</strong> Paste them in the Ingredients box below, one per line<br>
-          <strong style="color:var(--white);">4.</strong> Click Calculate Nutrition
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="document.getElementById('import-ingredients').focus()" style="width:100%;">
-          ✏️ Click here to paste ingredients
-        </button>
-      </div>`;
-    if(ingEl) {
-      ingEl.value = '';
-      ingEl.placeholder = 'Paste ingredients here, one per line:\n\n200g chicken breast\n1 cup white rice\n2 tbsp olive oil\n1 cup broccoli\n2 eggs\n1 tsp garlic';
-      ingEl.focus();
-    }
-    toast('Paste ingredients below and click Calculate Nutrition','info');
+  if(!html) {
+    if(resultEl) resultEl.innerHTML = '<div style="color:var(--orange);font-size:13px;padding:12px;background:var(--orange-g);border-radius:8px;">Could not fetch URL. Paste the ingredients manually below and click Calculate Nutrition.</div>';
     return;
   }
 
-  // Successfully fetched — extract ingredients
-  const ingredients = [];
+  // ── Extract recipe name ────────────────────────────────────
   const titleM = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  const recipeName = titleM ? titleM[1].replace(/[|–\-–|·•,].*$/, '').trim() : (nameEl?.value||'Imported Recipe');
+  const recipeName = titleM ? titleM[1].replace(/[|–\-–|·•,].*$/,'').trim() : (nameEl?.value||'Imported Recipe');
+  if(nameEl) nameEl.value = recipeName;
 
-  // Method 1: JSON-LD structured data (most reliable)
-  const jsonMatches = [...html.matchAll(/"recipeIngredient"\s*:\s*\[([^\]]+)\]/gi)];
-  jsonMatches.forEach(m => {
-    m[1].split(/,(?=\s*")/).forEach(item => {
-      const clean = item.replace(/^[\s,"\\]+|[\s,"\\]+$/g,'').replace(/\\n/g,' ').trim();
-      if(clean && clean.length > 2 && clean.length < 200) ingredients.push(clean);
-    });
-  });
+  // ── METHOD 1: Extract ACTUAL nutrition from JSON-LD ────────
+  // This is the most accurate — it's the same data the website displays
+  let actualNutrition = null;
 
-  // Method 2: Ingredient class
-  if(!ingredients.length) {
-    [...html.matchAll(/class="[^"]*ingredient[^"]*"[^>]*>\s*([^<]{3,150})/gi)]
-      .forEach(m=>{const t=m[1].trim();if(t&&t.length>2)ingredients.push(t);});
+  // Try all JSON-LD blocks on the page
+  const jsonldBlocks = [...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>(.*?)<\/script>/gis)];
+  for(const block of jsonldBlocks) {
+    try {
+      const data = JSON.parse(block[1].replace(/[\x00-\x1F]/g, ' '));
+      // Handle arrays and nested @graph
+      const items = Array.isArray(data) ? data : (data['@graph'] ? data['@graph'] : [data]);
+      for(const item of items) {
+        const recipe = item['@type'] === 'Recipe' ? item :
+                       (item.mainEntity?.['@type'] === 'Recipe' ? item.mainEntity : null);
+        if(recipe && recipe.nutrition) {
+          const n = recipe.nutrition;
+          const cal  = parseInt(String(n.calories||n.calorie||'').replace(/[^\d]/g,''));
+          const prot = parseFloat(String(n.proteinContent||'').replace(/[^\d.]/g,''));
+          const carb = parseFloat(String(n.carbohydrateContent||'').replace(/[^\d.]/g,''));
+          const fat2 = parseFloat(String(n.fatContent||'').replace(/[^\d.]/g,''));
+          const fiber= parseFloat(String(n.fiberContent||n.dietaryFiberContent||'').replace(/[^\d.]/g,''));
+          const sugar= parseFloat(String(n.sugarContent||'').replace(/[^\d.]/g,''));
+          if(cal > 0) {
+            actualNutrition = {
+              calories: cal,
+              protein:  isNaN(prot)?0:Math.round(prot*10)/10,
+              carbs:    isNaN(carb)?0:Math.round(carb*10)/10,
+              fat:      isNaN(fat2)?0:Math.round(fat2*10)/10,
+              fiber:    isNaN(fiber)?0:Math.round(fiber*10)/10,
+              sugar:    isNaN(sugar)?0:Math.round(sugar*10)/10,
+              source: 'exact',
+              servings: parseInt(String(recipe.recipeYield||'1').replace(/[^\d]/g,''))||1
+            };
+            break;
+          }
+        }
+      }
+    } catch(e) {}
+    if(actualNutrition) break;
   }
 
-  // Method 3: List items near ingredients section
-  if(!ingredients.length) {
-    const idx = html.toLowerCase().indexOf('ingredient');
-    if(idx>-1) {
-      [...html.substring(idx, idx+4000).matchAll(/<li[^>]*>\s*(?:<[^>]+>)*([^<]{4,120})/gi)]
-        .forEach(m=>{const t=m[1].trim();if(t)ingredients.push(t);});
+  // ── METHOD 2: Scrape nutrition from HTML elements ──────────
+  if(!actualNutrition) {
+    const calPatterns = [
+      /class="[^"]*(?:calories|calorie|kcal)[^"]*"[^>]*>\s*([\d,]+)/gi,
+      /"calories"\s*:\s*"?([\d,]+)/gi,
+      /calories[^\d]{0,20}([\d]{2,4})\s*(?:kcal|cal)?/gi,
+    ];
+    for(const pat of calPatterns) {
+      const m = [...html.matchAll(pat)];
+      if(m.length > 0) {
+        const cal = parseInt(m[0][1].replace(',',''));
+        if(cal > 50 && cal < 5000) {
+          // Try to also get protein/carbs/fat nearby
+          const protM = html.match(/protein[^\d]{0,20}([\d.]+)\s*g/i);
+          const carbM = html.match(/carb(?:ohydrate)?[^\d]{0,20}([\d.]+)\s*g/i);
+          const fatM  = html.match(/fat[^\d]{0,20}([\d.]+)\s*g/i);
+          actualNutrition = {
+            calories: cal,
+            protein:  protM ? parseFloat(protM[1]) : 0,
+            carbs:    carbM ? parseFloat(carbM[1]) : 0,
+            fat:      fatM  ? parseFloat(fatM[1]) : 0,
+            fiber: 0, sugar: 0,
+            source: 'scraped',
+            servings: 1
+          };
+          break;
+        }
+      }
     }
   }
 
-  if(nameEl) nameEl.value = recipeName;
-  if(ingEl)  ingEl.value  = ingredients.slice(0,35).join('\n') || '';
-
-  if(ingredients.length > 0) {
-    analyzeIngredients();
-    toast(`✅ Found ${ingredients.length} ingredients from ${new URL(url).hostname}!`, 'success');
-  } else {
-    toast('Could not extract ingredients — please paste them manually','info');
-    if(ingEl) ingEl.focus();
+  // ── Extract ingredients (for reference / manual fallback) ──
+  const ingredients = [];
+  const jsonM = html.match(/"recipeIngredient"\s*:\s*\[([^\]]+)\]/i);
+  if(jsonM) {
+    jsonM[1].split(/,(?=\s*")/).forEach(item => {
+      const clean = item.replace(/^[\s,"\\]+|[\s,"\\]+$/g,'').replace(/\\n/g,' ').trim();
+      if(clean && clean.length > 2 && clean.length < 200) ingredients.push(clean);
+    });
   }
+  if(!ingredients.length) {
+    [...html.matchAll(/class="[^"]*ingredient[^"]*"[^>]*>\s*([^<]{3,150})/gi)]
+      .forEach(m => { const t=m[1].trim(); if(t.length>2) ingredients.push(t); });
+  }
+  if(ingEl) ingEl.value = ingredients.slice(0,35).join('\n') || '';
+
+  // ── Show results ───────────────────────────────────────────
+  if(actualNutrition) {
+    // We got REAL numbers from the website — show them with confidence
+    showNutritionResult(actualNutrition, true);
+    toast(`✅ Got exact nutrition from ${new URL(url).hostname}`, 'success');
+  } else if(ingredients.length > 0) {
+    // Estimate from ingredients
+    const n = estimateNutrition(ingredients);
+    showNutritionResult(n, false);
+    toast(`Estimated from ${n.matched} of ${n.total} ingredients`, 'info');
+  } else {
+    if(resultEl) resultEl.innerHTML = '<div style="color:var(--orange);font-size:13px;padding:12px;background:var(--orange-g);border-radius:8px;">Could not extract data automatically.<br>Paste the ingredients below and click Calculate Nutrition.</div>';
+    toast('Paste ingredients manually below', 'info');
+  }
+}
+
+function showNutritionResult(n, isExact) {
+  // If estimating (not exact from site), ask user for serving count
+  // and divide automatically
+  if(!isExact && !n._askedServings) {
+    const servings = parseInt(document.getElementById('recipe-servings')?.value||'1')||1;
+    if(servings > 1) {
+      n = {
+        calories: Math.round(n.calories/servings),
+        protein:  Math.round(n.protein/servings*10)/10,
+        carbs:    Math.round(n.carbs/servings*10)/10,
+        fat:      Math.round(n.fat/servings*10)/10,
+        fiber:    Math.round((n.fiber||0)/servings*10)/10,
+        sugar:    Math.round((n.sugar||0)/servings*10)/10,
+        matched:  n.matched, total: n.total,
+        servings: servings, _askedServings: true
+      };
+    }
+  }
+  const el = document.getElementById('import-result');
+  if(!el) return;
+  el.style.display='block';
+  const badge = isExact
+    ? '<span style="background:rgba(34,197,94,0.15);color:var(--green);font-size:11px;padding:3px 8px;border-radius:20px;font-weight:700;">✓ EXACT FROM WEBSITE</span>'
+    : '<span style="background:rgba(255,107,43,0.15);color:var(--orange);font-size:11px;padding:3px 8px;border-radius:20px;font-weight:700;">~ ESTIMATED FROM INGREDIENTS</span>';
+  const perServing = n.servings && n.servings > 1
+    ? `<div style="font-size:11px;color:var(--gray);margin-bottom:8px;">Per serving (recipe makes ${n.servings} servings)</div>`
+    : '';
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-weight:700;font-size:14px;color:var(--white);">Nutrition Info</div>
+      ${badge}
+    </div>
+    ${perServing}
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+      <div style="background:var(--orange-g);border-radius:8px;padding:10px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--orange);">${n.calories}</div>
+        <div style="font-size:10px;color:var(--gray);">CAL</div>
+      </div>
+      <div style="background:rgba(59,130,246,.1);border-radius:8px;padding:10px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--blue);">${n.protein}g</div>
+        <div style="font-size:10px;color:var(--gray);">PROTEIN</div>
+      </div>
+      <div style="background:rgba(234,179,8,.1);border-radius:8px;padding:10px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--yellow);">${n.carbs}g</div>
+        <div style="font-size:10px;color:var(--gray);">CARBS</div>
+      </div>
+      <div style="background:rgba(239,68,68,.1);border-radius:8px;padding:10px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--red);">${n.fat}g</div>
+        <div style="font-size:10px;color:var(--gray);">FAT</div>
+      </div>
+    </div>
+    ${n.fiber||n.sugar ? `<div style="font-size:12px;color:var(--gray);margin-bottom:10px;">Fiber: ${n.fiber||0}g &nbsp;•&nbsp; Sugar: ${n.sugar||0}g</div>` : ''}
+    ${!isExact ? `<div style="font-size:11px;color:var(--gray2);margin-bottom:10px;">Matched ${n.matched} of ${n.total} ingredients — estimation may vary from website values</div>` : ''}
+    <button class="btn btn-primary" style="width:100%;" onclick="saveImportedRecipe()">+ Save to Recipe Book</button>`;
 }
 
 
@@ -2460,6 +2651,9 @@ function analyzeIngredients() {
   const lines = ingEl.value.split('\n');
   if(!lines.some(l=>l.trim())){toast('Add ingredients first','info');return;}
   const n = estimateNutrition(lines);
+  showNutritionResult(n, false);
+  return;
+  // dead code below kept for reference
   const el = document.getElementById('import-result');
   if(!el){ toast('Result container not found','info'); return; }
   el.style.display='block';
