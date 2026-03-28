@@ -2954,7 +2954,7 @@ if(S.profile){
 }
 
 // ── COOKBOOK RECIPE IMPORT HANDLER ───────────────────────────────
-// Reads ?import=BASE64 from URL and adds recipe to Recipe Book
+// If opened via ?import= link, gate access — only app owners can import
 (function() {
   try {
     var params = new URLSearchParams(window.location.search);
@@ -2964,34 +2964,100 @@ if(S.profile){
     var recipe = JSON.parse(atob(importData));
     if(!recipe || !recipe.name) return;
 
-    // customRecipes is the correct array renderRecipes() reads from
+    // Check if this person owns the app (has completed profile setup)
+    var ownsApp = S && S.profile && S.profile.name;
+
+    if(!ownsApp) {
+      // ── PAYWALL: show recipe preview + buy prompt ──────────────
+      // Hide the entire app UI
+      document.body.style.overflow = 'hidden';
+
+      var wall = document.createElement('div');
+      wall.id = 'import-paywall';
+      wall.style.cssText = [
+        'position:fixed','top:0','left:0','width:100%','height:100%',
+        'background:#0a0a0f','z-index:99999','display:flex',
+        'flex-direction:column','align-items:center','justify-content:center',
+        'padding:24px','box-sizing:border-box','font-family:system-ui,sans-serif'
+      ].join(';');
+
+      var cals  = recipe.calories || 0;
+      var prot  = recipe.protein  || 0;
+      var carbs = recipe.carbs    || 0;
+      var fat   = recipe.fat      || 0;
+
+      wall.innerHTML = [
+        // Logo
+        '<div style="background:#FF6B2B;width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;color:#fff;margin-bottom:16px;">BB</div>',
+
+        // Cookbook badge
+        '<div style="background:rgba(255,107,43,0.15);border:1px solid rgba(255,107,43,0.4);border-radius:20px;padding:4px 14px;font-size:12px;color:#FF6B2B;font-weight:600;margin-bottom:20px;letter-spacing:1px;">BROWSERBOD COOKBOOK RECIPE</div>',
+
+        // Recipe preview card
+        '<div style="background:#1a1a26;border:1px solid rgba(255,107,43,0.3);border-radius:16px;width:100%;max-width:380px;padding:20px;margin-bottom:24px;text-align:left;">',
+          '<div style="font-size:48px;text-align:center;margin-bottom:12px;">' + (recipe.emoji||'🌮') + '</div>',
+          '<div style="font-size:18px;font-weight:700;color:#f8fafc;margin-bottom:6px;text-align:center;">' + recipe.name + '</div>',
+          '<div style="font-size:12px;color:#94a3b8;text-align:center;margin-bottom:16px;">' + (recipe.category||'Mexican') + ' Recipe</div>',
+          '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:4px;">',
+            '<div style="background:#0f0f1a;border-radius:8px;padding:8px 4px;text-align:center;">',
+              '<div style="font-size:16px;font-weight:700;color:#FF6B2B;">' + cals + '</div>',
+              '<div style="font-size:9px;color:#475569;font-weight:600;">CAL</div>',
+            '</div>',
+            '<div style="background:#0f0f1a;border-radius:8px;padding:8px 4px;text-align:center;">',
+              '<div style="font-size:16px;font-weight:700;color:#3b82f6;">' + prot + 'g</div>',
+              '<div style="font-size:9px;color:#475569;font-weight:600;">PROTEIN</div>',
+            '</div>',
+            '<div style="background:#0f0f1a;border-radius:8px;padding:8px 4px;text-align:center;">',
+              '<div style="font-size:16px;font-weight:700;color:#eab308;">' + carbs + 'g</div>',
+              '<div style="font-size:9px;color:#475569;font-weight:600;">CARBS</div>',
+            '</div>',
+            '<div style="background:#0f0f1a;border-radius:8px;padding:8px 4px;text-align:center;">',
+              '<div style="font-size:16px;font-weight:700;color:#ef4444;">' + fat + 'g</div>',
+              '<div style="font-size:9px;color:#475569;font-weight:600;">FAT</div>',
+            '</div>',
+          '</div>',
+        '</div>',
+
+        // Message
+        '<div style="font-size:15px;font-weight:700;color:#f8fafc;margin-bottom:8px;text-align:center;">Import this recipe into BrowserBod</div>',
+        '<div style="font-size:13px;color:#94a3b8;margin-bottom:28px;text-align:center;max-width:320px;line-height:1.5;">You need the BrowserBod app to import and track this recipe. Get it for just $12.99 — one time, no subscription.</div>',
+
+        // CTA buttons
+        '<a href="https://stan.store/browserbod" style="display:block;width:100%;max-width:320px;background:#FF6B2B;color:#fff;text-decoration:none;text-align:center;padding:16px;border-radius:12px;font-size:15px;font-weight:700;margin-bottom:12px;box-sizing:border-box;">Get BrowserBod — $12.99</a>',
+        '<div style="font-size:12px;color:#475569;text-align:center;">One time purchase &nbsp;•&nbsp; No subscription &nbsp;•&nbsp; Works on any device</div>',
+      ].join('');
+
+      document.body.appendChild(wall);
+      // Stop normal app rendering
+      return;
+    }
+
+    // ── OWNER: import the recipe normally ──────────────────────
     S.customRecipes = S.customRecipes || [];
     var exists = S.customRecipes.some(function(r){ return r.name === recipe.name; });
 
     if(!exists) {
-      // Match the exact field names used by renderRecipes() and openRecipe()
       var lines = recipe.ingredients ? recipe.ingredients.split('\n').filter(Boolean) : [];
       S.customRecipes.unshift({
-        name:        recipe.name,
-        emoji:       recipe.emoji || '🌮',
-        ingredients: lines,
+        name:         recipe.name,
+        emoji:        recipe.emoji || '🌮',
+        ingredients:  lines,
         instructions: recipe.instructions || '',
-        calories:    recipe.calories || 0,
-        cal:         recipe.calories || 0,   // renderRecipes uses r.cal||r.calories
-        protein:     recipe.protein  || 0,
-        carbs:       recipe.carbs    || 0,
-        fat:         recipe.fat      || 0,
-        fiber:       recipe.fiber    || 0,
-        servings:    recipe.servings || 1,
-        cat:         'imported',             // filter category
-        time:        'Cookbook',             // shown in recipe card meta
-        diff:        recipe.category || 'Mexican', // shown in recipe card meta
-        source:      'BrowserBod Cookbook',
-        id:          Date.now()
+        calories:     recipe.calories || 0,
+        cal:          recipe.calories || 0,
+        protein:      recipe.protein  || 0,
+        carbs:        recipe.carbs    || 0,
+        fat:          recipe.fat      || 0,
+        fiber:        recipe.fiber    || 0,
+        servings:     recipe.servings || 1,
+        cat:          'imported',
+        time:         'Cookbook',
+        diff:         recipe.category || 'Mexican',
+        source:       'BrowserBod Cookbook',
+        id:           Date.now()
       });
       save();
 
-      // Navigate to recipes page then re-render
       if(typeof showPage === 'function') showPage('recipes', null);
       setTimeout(function(){
         if(typeof renderRecipes === 'function') renderRecipes();
@@ -3005,7 +3071,6 @@ if(S.profile){
       }, 300);
     }
 
-    // Clean URL so refreshing doesn't re-import
     window.history.replaceState({}, document.title, window.location.pathname);
 
   } catch(e) {
