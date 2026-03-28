@@ -2953,6 +2953,69 @@ if(S.profile){
   document.querySelectorAll('#nav-name').forEach(el=>el.textContent=S.profile.name);
 }
 
+// ── COOKBOOK RECIPE IMPORT HANDLER ───────────────────────────────
+// Reads ?import=BASE64 from URL and adds recipe to Recipe Book
+(function() {
+  try {
+    var params = new URLSearchParams(window.location.search);
+    var importData = params.get('import');
+    if(!importData) return;
+
+    var recipe = JSON.parse(atob(importData));
+    if(!recipe || !recipe.name) return;
+
+    // Add to recipe book
+    if(!S.recipes) S.recipes = [];
+    var exists = S.recipes.some(function(r){ return r.name === recipe.name; });
+
+    if(!exists) {
+      S.recipes.unshift({
+        name: recipe.name,
+        emoji: recipe.emoji || '🌮',
+        ingredients: recipe.ingredients || '',
+        instructions: recipe.instructions || '',
+        calories: recipe.calories || 0,
+        protein: recipe.protein || 0,
+        carbs: recipe.carbs || 0,
+        fat: recipe.fat || 0,
+        fiber: recipe.fiber || 0,
+        servings: recipe.servings || 1,
+        category: recipe.category || 'Mexican',
+        source: 'BrowserBod Cookbook',
+        id: Date.now()
+      });
+      save();
+
+      // Navigate to recipes page and show success toast
+      setTimeout(function() {
+        // Switch to recipes page
+        if(typeof showPage === 'function') showPage('recipes', null);
+        else if(typeof mobileSwitchTab === 'function') {
+          // Try to find and click the More tab then Recipes
+          var moreBtn = document.getElementById('tab-more');
+          if(moreBtn) moreBtn.click();
+
+        }
+        setTimeout(function(){
+          toast('Recipe "' + recipe.name + '" added to your Recipe Book!', 'success');
+          if(typeof renderRecipes === 'function') renderRecipes();
+        }, 600);
+      }, 300);
+
+    } else {
+      setTimeout(function(){
+        toast('"' + recipe.name + '" is already in your Recipe Book', 'info');
+        if(typeof showPage === 'function') showPage('recipes', null);
+      }, 300);
+    }
+
+    // Clean the URL so it doesn't re-import on refresh
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+  } catch(e) {
+    console.log('Recipe import error:', e);
+  }
+})();
 
 // ── HOW TO OPEN BANNER ───────────────────────────────────────────
 </script>
